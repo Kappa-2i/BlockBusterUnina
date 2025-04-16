@@ -6,11 +6,9 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 
-#define RED "\x1b[31m"
+
 #define GREEN "\x1b[32m"
 #define YELLOW "\x1b[33m"
-#define BLUE "\x1b[34m"
-#define MAGENTA "\x1b[35m"
 #define CYAN "\x1b[36m"
 #define WHITE "\x1b[0m"
 
@@ -28,7 +26,7 @@ int main()
 
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(8080);
+    server_addr.sin_port = htons(8081);
     inet_aton("127.0.0.1", &(server_addr.sin_addr));
 
     if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
@@ -38,15 +36,15 @@ int main()
     }
 
     printf("Connesso al server\n");
-    while (1)
-    {
+    while (1){
         printMenu(current_user);
 
         fgets(buffer, BUFFER_SIZE, stdin);
         buffer[strcspn(buffer, "\n")] = 0;
-        if (strcmp(buffer, "EXIT") == 0){
+        if (strcmp(buffer, "ESCI") == 0){
             break;
         }
+
 
         send(sock, buffer, strlen(buffer), 0);
 
@@ -69,13 +67,15 @@ void printMenu(const char *current_user){
     printf("\n%s╔════════════════════════════════════╗%s\n", CYAN, WHITE);
     printf("%s║%s        🎬  %sMENU PRINCIPALE%s         %s║%s\n", CYAN, WHITE, YELLOW, WHITE, CYAN, WHITE);
     printf("%s╠════════════════════════════════════╣%s\n", CYAN, WHITE);
-    printf("%s║%s  1. REGISTER <user> <pass>         %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  1. REGISTRAZIONE <user> <pass>    %s║%s\n", CYAN, WHITE, CYAN, WHITE);
     printf("%s║%s  2. LOGIN <user> <pass>            %s║%s\n", CYAN, WHITE, CYAN, WHITE);
-    printf("%s║%s  3. SEARCH <title>                 %s║%s\n", CYAN, WHITE, CYAN, WHITE);
-    printf("%s║%s  4. RENT <user> <title>            %s║%s\n", CYAN, WHITE, CYAN, WHITE);
-    printf("%s║%s  5. RETURN <user> <title>          %s║%s\n", CYAN, WHITE, CYAN, WHITE);
-    printf("%s║%s  6. CART                           %s║%s\n", CYAN, WHITE, CYAN, WHITE);
-    printf("%s║%s  0. EXIT                           %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  3. CERCA <title>                  %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  4. AGGIUNGI AL CARRELLO <title>   %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  5. RIMUOVI DAL CARRELLO <title>   %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  6. CHECKOUT                       %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  7. RESTITUISCI FILM <title>       %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  8. VISUALIZZA PRESTITI            %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  0. ESCI                           %s║%s\n", CYAN, WHITE, CYAN, WHITE);
     printf("%s╚════════════════════════════════════╝%s\n", CYAN, WHITE);
     printf("%s❯ Seleziona un'opzione: %s", GREEN, WHITE);
 }
