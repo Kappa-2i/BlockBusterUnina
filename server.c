@@ -7,7 +7,7 @@
 #include <libpq-fe.h>
 #include <time.h>
 
-#define PORT 8081
+#define PORT 8080
 #define MAX_CLIENTS 2
 #define BUFFER_SIZE 1024
 
@@ -19,7 +19,11 @@ void setup_database();
 void register_user(int sock, char* arg1, char* arg2);
 int login_user(int sock, char* arg1, char* arg2);
 void search_film(int sock, char* arg1);
-void rent_film(int sock, int id_user, char* arg2);
+void add_to_cart(int sock, int id_user, char* arg1);
+void remove_from_cart(int sock, int id_user, char* arg1);
+void view_cart(int sock, int id_user);
+void check_out(int sock, int id_user);
+void view_rent(int sock, int id_user);
 
 int main()
 {
@@ -80,31 +84,44 @@ void *handle_client(void *client_socket){
     ssize_t bytes_read;
     int id_user = -1; 
 
-    while ((bytes_read = recv(sock, buffer, BUFFER_SIZE, 0)) > 0) {
+    while ((bytes_read = recv(sock, buffer, BUFFER_SIZE - 1, 0)) > 0) {
         buffer[bytes_read] = '\0';
         printf("Messaggio ricevuto: %s", buffer);
-        
-        char command[BUFFER_SIZE], arg1[BUFFER_SIZE], arg2[BUFFER_SIZE];
-        sscanf(buffer, "%s %s %s", command, arg1, arg2);
 
-        if (strcmp(command, "REGISTRAZIONE") == 0) {
-            register_user(sock, arg1, arg2);
-        } else if (strcmp(command, "LOGIN") == 0) {
-            id_user = login_user(sock, arg1, arg2);
-        } else if (strcmp(command, "CERCA") == 0) {
-            search_film(sock, arg1);
-        } else if (strcmp(command, "NOLEGGIA") == 0) {
-            rent_film(sock, id_user, arg1);
-        } else if (strcmp(command, "CARRELLO") == 0) {
-            //view_cart(sock);
-        } else if (strcmp(command, "CHECK OUT") == 0) {
-            //check_out(sock);
-        } else if (strcmp(command, "RESTITUISCI") == 0) {
-            //return_film(sock, arg1, arg2);
+        // Parsing con strtok
+        char *command = strtok(buffer, " ");
+        char *args = strtok(NULL, ""); // prende TUTTO il resto
+
+        if (command == NULL) {
+            send(sock, "Comando non valido\n", 20, 0);
+            continue;
+        }
+
+        if (!strcmp(command, "REGISTRAZIONE") || !strcmp(command, "1")) {
+            char *username = strtok(args, " ");
+            char *password = strtok(NULL, " ");
+            register_user(sock, username, password);
+        } else if (!strcmp(command, "LOGIN") || !strcmp(command, "2")) {
+            char *username = strtok(args, " ");
+            char *password = strtok(NULL, " ");
+            id_user = login_user(sock, username, password);
+        } else if (!strcmp(command, "CERCA") || !strcmp(command, "3")) {
+            search_film(sock, args);  
+        } else if (!strcmp(command, "AGGIUNGI_AL_CARRELLO" ) || !strcmp(command, "4")) {
+            add_to_cart(sock, id_user, args);
+        } else if (!strcmp(command, "RIMUOVI_DAL_CARRELLO") || !strcmp(command, "5")) {
+            remove_from_cart(sock, id_user, args);
+        } else if (!strcmp(command, "VISUALIZZA_CARRELLO") || !strcmp(command, "6")) {
+            view_cart(sock, id_user);
+        } else if (!strcmp(command, "CHECKOUT") || !strcmp(command, "7")) {
+            check_out(sock, id_user);
+        } else if (!strcmp(command, "VISUALIZZA_PRESTITI") || !strcmp(command, "9")) {
+            view_rent(sock, id_user);
         } else {
             send(sock, "Comando non valido\n", 20, 0);
         }
     }
+
 
     printf("Client disconnesso.\n");
     close(sock);
@@ -128,13 +145,14 @@ void setup_database() {
 
 int execute_query(const char *query) {
     PGresult *res = PQexec(conn, query);
-    printf("RES: %d\n", PQresultStatus(res));
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         fprintf(stderr, "Errore nell'esecuzione della query: %s", PQerrorMessage(conn));
+        PQclear(res);
         return 0;
     }
-    return 1;
+
     PQclear(res);
+    return 1;
 }
 
 
@@ -180,6 +198,7 @@ int login_user(int sock, char *username, char *password) {
 
 
 void search_film(int sock, char *title) {
+
     char query[BUFFER_SIZE];
     snprintf(query, BUFFER_SIZE, "SELECT * FROM film WHERE titolo ILIKE '%s';", title);
     
@@ -192,16 +211,14 @@ void search_film(int sock, char *title) {
     }
 
     char message[BUFFER_SIZE];
-    for (int i = 0; i < rows; i++) {
-        snprintf(message, BUFFER_SIZE, "Film trovato: %s, Copie disponibili: %s\n", PQgetvalue(res, i, 1), PQgetvalue(res, i, 2));
-        send(sock, message, strlen(message), 0);
-    }
+    snprintf(message, BUFFER_SIZE, "Film trovato: %s, Copie disponibili: %s\n", PQgetvalue(res, 0, 1), PQgetvalue(res, 0, 2));
+    send(sock, message, strlen(message), 0);
 
     PQclear(res);
 }
 
 
-void rent_film(int sock, int id_user, char *title) {
+void add_to_cart(int sock, int id_user, char *title) {
 
     if (id_user == -1) {
         send(sock, "Devi essere registrato!\n", 25, 0);
@@ -213,7 +230,7 @@ void rent_film(int sock, int id_user, char *title) {
     
     PGresult *res = PQexec(conn, query);
     if (PQntuples(res) == 0) {
-        send(sock, "Film non trovato\n", 17, 0);
+        send(sock, "Film non trovato\n", 18, 0);
         PQclear(res);
         return;
     } 
@@ -221,16 +238,144 @@ void rent_film(int sock, int id_user, char *title) {
     int film_id = atoi(PQgetvalue(res, 0, 0));
     int available_copies = atoi(PQgetvalue(res, 0, 1));
     if (available_copies <= 0) {
-        send(sock, "Nessuna copia disponibile\n", 26, 0);
+        send(sock, "Nessuna copia disponibile\n", 27, 0);
         PQclear(res);
         return;
     }
 
     snprintf(query, BUFFER_SIZE, "INSERT INTO prestiti (id_utente, id_film, stato) "
-                                         "VALUES ((SELECT id FROM utenti WHERE id = '%d'), %d, 'in_attesa');", 
+                                         "VALUES (%d, %d, 'in_attesa');", 
                                          id_user, film_id);
     execute_query(query);
-    send(sock, "Film aggiunto al carrello!\n", 28, 0);
+
+    snprintf(query, BUFFER_SIZE, "UPDATE film SET copie_disponibili = copie_disponibili - 1, copie_prestito = copie_prestito + 1 WHERE id = %d;", film_id );
+    execute_query(query);
     
+    send(sock, "Film aggiunto al carrello!\n", 28, 0);
+
+    PQclear(res);
+}
+
+
+void remove_from_cart(int sock, int id_user, char* title) {
+    if (id_user == -1) {
+        send(sock, "Devi essere registrato!\n", 25, 0);
+        return;
+    }
+
+    char query[BUFFER_SIZE];
+    snprintf(query, BUFFER_SIZE, "SELECT * FROM prestiti WHERE id_film = (SELECT id FROM film WHERE titolo ILIKE '%s') AND id_utente = %d AND stato = 'in_attesa'; ", title, id_user);
+    
+    PGresult *res = PQexec(conn, query);
+    if (PQntuples(res) == 0) {
+        send(sock, "Film non trovato\n", 18, 0);
+        PQclear(res);
+        return;
+    } 
+
+    snprintf(query, BUFFER_SIZE, "DELETE FROM prestiti " 
+                                    "WHERE id IN ( "
+                                    "SELECT id FROM prestiti "
+                                    "WHERE id_utente = %d "
+                                        "AND id_film = (SELECT id FROM film WHERE titolo ILIKE '%s') "
+                                        "AND stato = 'in_attesa' "
+                                    "LIMIT 1); ", id_user, title);
+    execute_query(query);
+
+    snprintf(query, BUFFER_SIZE, "UPDATE film SET copie_disponibili = copie_disponibili + 1, copie_prestito = copie_prestito - 1 WHERE titolo ILIKE '%s';", title);
+    execute_query(query);
+
+    send(sock, "Film rimosso dal carrello!\n", 28, 0);
+}
+
+
+void view_cart(int sock, int id_user) {
+    if (id_user == -1) {
+        send(sock, "Devi essere registrato!\n", 25, 0);
+        return;
+    }
+
+    char query[BUFFER_SIZE];
+    snprintf(query, BUFFER_SIZE,
+        "SELECT titolo FROM prestiti p JOIN film f ON p.id_film = f.id "
+        "WHERE id_utente = %d AND stato = 'in_attesa';", id_user);
+
+    PGresult *res = PQexec(conn, query);
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        send(sock, "Carrello vuoto!\n", 18, 0);
+        PQclear(res);
+        return;
+    }
+
+    char message[BUFFER_SIZE * 4] = "\n";  
+    for (int i = 0; i < rows; i++) {
+        char line[BUFFER_SIZE];
+        snprintf(line, BUFFER_SIZE, "%d - %s\n", i+1, PQgetvalue(res, i, 0));
+        strncat(message, line, sizeof(message) - strlen(message) - 1);
+    }
+
+    send(sock, message, strlen(message), 0);
+    PQclear(res);
+}
+
+void check_out(int sock, int id_user){
+
+    if (id_user == -1) {
+        send(sock, "Devi essere registrato!\n", 25, 0);
+        return;
+    }
+
+    char query[BUFFER_SIZE];
+    snprintf(query, BUFFER_SIZE,
+        "SELECT titolo FROM prestiti p JOIN film f ON p.id_film = f.id "
+        "WHERE id_utente = %d AND stato = 'in_attesa';", id_user);
+
+    PGresult *res = PQexec(conn, query);
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        send(sock, "Carrello vuoto!\n", 18, 0);
+        PQclear(res);
+        return;
+    }
+
+    snprintf(query, BUFFER_SIZE, "UPDATE prestiti SET stato = 'effettuato', data_prestito = CURRENT_DATE, data_restituzione = CURRENT_DATE + INTERVAL '7 days' WHERE id_utente = %d AND stato = 'in_attesa';", id_user);
+    execute_query(query);
+
+    send(sock, "Film noleggiati con successo!\n", 31, 0);
+}
+
+
+
+
+
+
+void view_rent(int sock, int id_user){
+    if (id_user == -1) {
+        send(sock, "Devi essere registrato!\n", 25, 0);
+        return;
+    }
+
+    char query[BUFFER_SIZE];
+    snprintf(query, BUFFER_SIZE,
+        "SELECT titolo, TO_CHAR(data_restituzione, 'DD-MM-YYYY') AS data_restituzione FROM prestiti p JOIN film f ON p.id_film = f.id "
+        "WHERE id_utente = %d AND stato = 'effettuato';", id_user);
+
+    PGresult *res = PQexec(conn, query);
+    int rows = PQntuples(res);
+    if (rows == 0) {
+        send(sock, "Nessun film noleggiato!\n", 25, 0);
+        PQclear(res);
+        return;
+    }
+
+    char message[BUFFER_SIZE * 4] = "\n";  // 
+    for (int i = 0; i < rows; i++) {
+        char line[BUFFER_SIZE];
+        snprintf(line, BUFFER_SIZE, "%d - %s da consegnare entro il %s\n", i+1, PQgetvalue(res, i, 0), PQgetvalue(res, i, 1));
+        strncat(message, line, sizeof(message) - strlen(message) - 1);
+    }
+
+    send(sock, message, strlen(message), 0);
     PQclear(res);
 }

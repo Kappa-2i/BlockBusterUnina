@@ -26,7 +26,7 @@ int main()
 
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(8081);
+    server_addr.sin_port = htons(8080);
     inet_aton("127.0.0.1", &(server_addr.sin_addr));
 
     if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
@@ -41,7 +41,7 @@ int main()
 
         fgets(buffer, BUFFER_SIZE, stdin);
         buffer[strcspn(buffer, "\n")] = 0;
-        if (strcmp(buffer, "ESCI") == 0){
+        if (!strcmp(buffer, "ESCI") || !strcmp(buffer, "0")){
             break;
         }
 
@@ -70,11 +70,12 @@ void printMenu(const char *current_user){
     printf("%s║%s  1. REGISTRAZIONE <user> <pass>    %s║%s\n", CYAN, WHITE, CYAN, WHITE);
     printf("%s║%s  2. LOGIN <user> <pass>            %s║%s\n", CYAN, WHITE, CYAN, WHITE);
     printf("%s║%s  3. CERCA <title>                  %s║%s\n", CYAN, WHITE, CYAN, WHITE);
-    printf("%s║%s  4. AGGIUNGI AL CARRELLO <title>   %s║%s\n", CYAN, WHITE, CYAN, WHITE);
-    printf("%s║%s  5. RIMUOVI DAL CARRELLO <title>   %s║%s\n", CYAN, WHITE, CYAN, WHITE);
-    printf("%s║%s  6. CHECKOUT                       %s║%s\n", CYAN, WHITE, CYAN, WHITE);
-    printf("%s║%s  7. RESTITUISCI FILM <title>       %s║%s\n", CYAN, WHITE, CYAN, WHITE);
-    printf("%s║%s  8. VISUALIZZA PRESTITI            %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  4. AGGIUNGI_AL_CARRELLO <title>   %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  5. RIMUOVI_DAL_CARRELLO <title>   %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  6. VISUALIZZA_CARRELLO            %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  7. CHECKOUT                       %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  8. RESTITUISCI_FILM <title>       %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  9. VISUALIZZA_PRESTITI            %s║%s\n", CYAN, WHITE, CYAN, WHITE);
     printf("%s║%s  0. ESCI                           %s║%s\n", CYAN, WHITE, CYAN, WHITE);
     printf("%s╚════════════════════════════════════╝%s\n", CYAN, WHITE);
     printf("%s❯ Seleziona un'opzione: %s", GREEN, WHITE);
