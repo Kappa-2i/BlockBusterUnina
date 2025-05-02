@@ -401,7 +401,7 @@ void return_film(int sock, int id_user, char *title){
 
     snprintf(query, BUFFER_SIZE,
         "SELECT * FROM prestiti p JOIN film f ON p.id_film = f.id "
-        "WHERE id_utente = %d AND f.titolo = '%s' AND stato = 'effettuato'; ", id_user, title);
+        "WHERE id_utente = %d AND f.titolo = '%s' AND (stato = 'effettuato' or stato = 'scaduto'); ", id_user, title);
 
     res = PQexec(conn, query);
     rows = PQntuples(res);
@@ -416,7 +416,7 @@ void return_film(int sock, int id_user, char *title){
                                     "SELECT id FROM prestiti "
                                     "WHERE id_utente = %d "
                                         "AND id_film = (SELECT id FROM film WHERE titolo ILIKE '%s') "
-                                        "AND stato = 'effettuato' "
+                                        "AND (stato = 'effettuato' OR stato = 'scaduto') "
                                         "ORDER BY data_restituzione "
                                     "LIMIT 1); ", id_user, title);
     execute_query(query);
@@ -434,7 +434,7 @@ void view_rent(int sock, int id_user){
     char query[BUFFER_SIZE];
     snprintf(query, BUFFER_SIZE,
         "SELECT titolo, TO_CHAR(data_restituzione, 'DD-MM-YYYY') AS data_restituzione FROM prestiti p JOIN film f ON p.id_film = f.id "
-        "WHERE id_utente = %d AND stato = 'effettuato';", id_user);
+        "WHERE id_utente = %d AND (stato = 'effettuato' OR stato = 'scaduto') ;", id_user);
 
     PGresult *res = PQexec(conn, query);
     int rows = PQntuples(res);
