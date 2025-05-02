@@ -39,7 +39,13 @@ int main()
     while (1){
         printMenu(current_user);
 
-        fgets(buffer, BUFFER_SIZE, stdin);
+        //fgets(buffer, BUFFER_SIZE, stdin);
+
+        if (fgets(buffer, BUFFER_SIZE, stdin) == NULL) {
+            printf("Errore nella lettura dell'input.\n");
+            continue;
+        }
+        
         buffer[strcspn(buffer, "\n")] = 0;
         if (!strcmp(buffer, "ESCI") || !strcmp(buffer, "0")){
             break;
@@ -61,7 +67,7 @@ int main()
 void printMenu(const char *current_user){
 
     if (strlen(current_user) > 0){
-        printf("%s👤 Utente loggato: %s%s\n\n", GREEN, current_user, WHITE);
+        printf("\n%s👤 Utente loggato: %s%s\n\n", GREEN, current_user, WHITE);
     }
 
     printf("\n%s╔════════════════════════════════════╗%s\n", CYAN, WHITE);
@@ -76,6 +82,7 @@ void printMenu(const char *current_user){
     printf("%s║%s  7. CHECKOUT                       %s║%s\n", CYAN, WHITE, CYAN, WHITE);
     printf("%s║%s  8. RESTITUISCI_FILM <title>       %s║%s\n", CYAN, WHITE, CYAN, WHITE);
     printf("%s║%s  9. VISUALIZZA_PRESTITI            %s║%s\n", CYAN, WHITE, CYAN, WHITE);
+    printf("%s║%s  10. VISUALIZZA_MESSAGGI           %s║%s\n", CYAN, WHITE, CYAN, WHITE);
     printf("%s║%s  0. ESCI                           %s║%s\n", CYAN, WHITE, CYAN, WHITE);
     printf("%s╚════════════════════════════════════╝%s\n", CYAN, WHITE);
     printf("%s❯ Seleziona un'opzione: %s", GREEN, WHITE);
@@ -85,7 +92,7 @@ void handleServerResponse(char* buffer, char* current_user) {
     system("clear");
     printf("\n%s📨 Risposta del server:%s %s\n", YELLOW, WHITE, buffer);
 
-    if (strstr(buffer, "Login effettuato con successo") != NULL) {
-        sscanf(buffer, "Login effettuato con successo %s", current_user);
+    if (strncmp(buffer, "Login effettuato con successo ", 30) == 0) {
+        sscanf(buffer + 30, "%s", current_user);
     }
 }
