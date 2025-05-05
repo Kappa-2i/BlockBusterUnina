@@ -10,10 +10,14 @@
 #define PORT 8080
 #define MAX_CLIENTS 2
 #define BUFFER_SIZE 1024
+#define MAX_RENT 10
+
+pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 PGconn *conn;
 void *handle_client(void *client_socket);
 int execute_query(const char *query);
+PGresult* execute_select(const char* query);
 void setup_database();
 
 void register_user(int sock, char* arg1, char* arg2);
@@ -151,7 +155,11 @@ void setup_database() {
 
 
 int execute_query(const char *query) {
+
+    pthread_mutex_lock(&db_mutex);  
     PGresult *res = PQexec(conn, query);
+    pthread_mutex_unlock(&db_mutex);
+
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         fprintf(stderr, "Errore nell'esecuzione della query: %s", PQerrorMessage(conn));
         PQclear(res);
@@ -160,6 +168,21 @@ int execute_query(const char *query) {
 
     PQclear(res);
     return 1;
+}
+
+PGresult* execute_select(const char* query) {
+    PGresult *res;
+
+    pthread_mutex_lock(&db_mutex);
+    res = PQexec(conn, query);
+    pthread_mutex_unlock(&db_mutex);
+
+    if (!res || PQresultStatus(res) != PGRES_TUPLES_OK) {
+        if (res) PQclear(res);
+        return NULL;
+    }
+
+    return res;
 }
 
 
@@ -172,7 +195,7 @@ void register_user(int sock, char *username, char *password) {
     snprintf(query, BUFFER_SIZE, "INSERT INTO utenti (username, password) VALUES ('%s', '%s');", username, password);
     
     if(execute_query(query) == 0){
-        send(sock, "Utente già registrato", 21, 0);
+        send(sock, "Utente già registrato", 23, 0);
         return;
     }
     send(sock, "Registrazione completata\n", 24, 0);
@@ -180,14 +203,14 @@ void register_user(int sock, char *username, char *password) {
 
 
 int login_user(int sock, char *username, char *password) {
+
     char query[BUFFER_SIZE];
     snprintf(query, BUFFER_SIZE,
-             "SELECT * FROM utenti WHERE username = '%s' AND password = '%s';",
+             "SELECT id, username FROM utenti WHERE username = '%s' AND password = '%s';",
              username, password);
-
-    PGresult *res = PQexec(conn, query);
-    if (PQntuples(res) == 0) {
-        PQclear(res);
+   PGresult *res = execute_select(query);
+    if (!res || PQntuples(res) == 0) {
+        if (res) PQclear(res);
         send(sock, "Inserisci credenziali valide", 28, 0);
         return -1;
     }
@@ -196,22 +219,22 @@ int login_user(int sock, char *username, char *password) {
     const char* nomeUtente = PQgetvalue(res, 0, 1);
     PQclear(res);
 
-    // 🔄 Aggiorna prestiti scaduti
+
     snprintf(query, BUFFER_SIZE,
              "UPDATE prestiti SET stato = 'scaduto' "
              "WHERE stato = 'effettuato' AND id_utente = %d AND data_restituzione < CURRENT_DATE;",
              idUser);
-    PQexec(conn, query); // non serve salvare il risultato
+    execute_query(query);
 
-    // 📥 Verifica se ci sono prestiti scaduti
     snprintf(query, BUFFER_SIZE,
              "SELECT COUNT(*) FROM prestiti WHERE id_utente = %d AND stato = 'scaduto';",
              idUser);
-    res = PQexec(conn, query);
+    res = execute_select(query);
+    if (!res) return -1;
+
     int countScaduti = atoi(PQgetvalue(res, 0, 0));
     PQclear(res);
 
-    // 📤 Costruisci messaggio di login
     char message[BUFFER_SIZE] = "";
     if (countScaduti > 0) {
         snprintf(message, BUFFER_SIZE,
@@ -233,11 +256,10 @@ void search_film(int sock, char *title) {
     char query[BUFFER_SIZE];
     snprintf(query, BUFFER_SIZE, "SELECT * FROM film WHERE titolo ILIKE '%s';", title);
     
-    PGresult *res = PQexec(conn, query);
-    int rows = PQntuples(res);
-    if (rows == 0){
+    PGresult *res = execute_select(query);
+    if (!res || PQntuples(res) == 0 ){
+        if (res) PQclear(res);
         send(sock, "Film non trovato\n", 17, 0);
-        PQclear(res);
         return;
     }
 
@@ -259,10 +281,10 @@ void add_to_cart(int sock, int id_user, char *title) {
     char query[BUFFER_SIZE];
     snprintf(query, BUFFER_SIZE, "SELECT id, copie_disponibili FROM film WHERE titolo ILIKE '%s';", title);
     
-    PGresult *res = PQexec(conn, query);
-    if (PQntuples(res) == 0) {
+    PGresult *res = execute_select(query);
+    if (!res || PQntuples(res) == 0) {
+        if (res) PQclear(res);
         send(sock, "Film non trovato\n", 18, 0);
-        PQclear(res);
         return;
     } 
 
@@ -284,7 +306,6 @@ void add_to_cart(int sock, int id_user, char *title) {
     
     send(sock, "Film aggiunto al carrello!\n", 28, 0);
 
-    PQclear(res);
 }
 
 
@@ -297,10 +318,10 @@ void remove_from_cart(int sock, int id_user, char* title) {
     char query[BUFFER_SIZE];
     snprintf(query, BUFFER_SIZE, "SELECT * FROM prestiti WHERE id_film = (SELECT id FROM film WHERE titolo ILIKE '%s') AND id_utente = %d AND stato = 'in_attesa'; ", title, id_user);
     
-    PGresult *res = PQexec(conn, query);
-    if (PQntuples(res) == 0) {
+    PGresult *res = execute_select(query);
+    if (!res || PQntuples(res) == 0) {
+        if (res) PQclear(res);
         send(sock, "Film non trovato\n", 18, 0);
-        PQclear(res);
         return;
     } 
 
@@ -317,6 +338,7 @@ void remove_from_cart(int sock, int id_user, char* title) {
     execute_query(query);
 
     send(sock, "Film rimosso dal carrello!\n", 28, 0);
+
 }
 
 
@@ -331,13 +353,14 @@ void view_cart(int sock, int id_user) {
         "SELECT titolo FROM prestiti p JOIN film f ON p.id_film = f.id "
         "WHERE id_utente = %d AND stato = 'in_attesa';", id_user);
 
-    PGresult *res = PQexec(conn, query);
-    int rows = PQntuples(res);
-    if (rows == 0) {
+    PGresult *res = execute_select(query);
+    if (!res || PQntuples(res) == 0) {
+        if (res) PQclear(res);
         send(sock, "Carrello vuoto!\n", 18, 0);
-        PQclear(res);
         return;
     }
+
+    int rows = PQntuples(res);
 
     char message[BUFFER_SIZE * 4] = "\n";  
     for (int i = 0; i < rows; i++) {
@@ -362,13 +385,34 @@ void check_out(int sock, int id_user){
         "SELECT titolo FROM prestiti p JOIN film f ON p.id_film = f.id "
         "WHERE id_utente = %d AND stato = 'in_attesa';", id_user);
 
-    PGresult *res = PQexec(conn, query);
-    int rows = PQntuples(res);
-    if (rows == 0) {
+    PGresult *res = execute_select(query);
+    
+
+    if (!res || PQntuples(res) == 0) {
+        if (res) PQclear(res);
         send(sock, "Carrello vuoto!\n", 18, 0);
+        return;
+    } 
+
+    int rows = PQntuples(res);
+    
+    snprintf(query, BUFFER_SIZE,
+             "SELECT COUNT(*) FROM prestiti WHERE id_utente = %d AND (stato = 'scaduto' OR stato = 'effettuato');",
+             id_user);
+    res = execute_select(query);
+    if (!res) return;
+
+    int countPrestiti = atoi(PQgetvalue(res, 0, 0));
+
+    if((countPrestiti + rows) > MAX_RENT) {
+        char message[BUFFER_SIZE];
+        snprintf(message, BUFFER_SIZE, "Puoi noleggiare al massimo %d film!\n", MAX_RENT);
+        send(sock, message, strlen(message), 0);
         PQclear(res);
         return;
     }
+
+    PQclear(res);
 
     snprintf(query, BUFFER_SIZE, "UPDATE prestiti SET stato = 'effettuato', data_prestito = CURRENT_DATE, data_restituzione = CURRENT_DATE + INTERVAL '7 days' WHERE id_utente = %d AND stato = 'in_attesa';", id_user);
     execute_query(query);
@@ -387,29 +431,30 @@ void return_film(int sock, int id_user, char *title){
     char query[BUFFER_SIZE];
     snprintf(query, BUFFER_SIZE,
         "SELECT * FROM prestiti "
-        "WHERE id_utente = %d AND stato = 'effettuato'; ", id_user);
+        "WHERE id_utente = %d AND (stato = 'effettuato' OR stato = 'scaduto'); ", id_user);
 
-    PGresult *res = PQexec(conn, query);
-    int rows = PQntuples(res);
-    if (rows == 0) {
+    PGresult *res = execute_select(query);
+    
+    if (!res || PQntuples(res) == 0) {
+        if (res) PQclear(res);
         send(sock, "Non hai nessun film da restituire!\n", 33, 0);
-        PQclear(res);
         return;
     }
-
+    int rows = PQntuples(res);
     PQclear(res);
 
     snprintf(query, BUFFER_SIZE,
         "SELECT * FROM prestiti p JOIN film f ON p.id_film = f.id "
         "WHERE id_utente = %d AND f.titolo = '%s' AND (stato = 'effettuato' or stato = 'scaduto'); ", id_user, title);
 
-    res = PQexec(conn, query);
-    rows = PQntuples(res);
-    if (rows == 0) {
+    res = execute_select(query);
+    
+    if (!res || PQntuples(res) == 0) {
+        if (res) PQclear(res);
         send(sock, "Non hai noleggiato questo film!\n", 33, 0);
-        PQclear(res);
         return;
     }
+    
 
     snprintf(query, BUFFER_SIZE, "DELETE FROM prestiti " 
                                     "WHERE id IN ( "
@@ -420,6 +465,10 @@ void return_film(int sock, int id_user, char *title){
                                         "ORDER BY data_restituzione "
                                     "LIMIT 1); ", id_user, title);
     execute_query(query);
+
+    snprintf(query, BUFFER_SIZE, "UPDATE film SET copie_disponibili = copie_disponibili + 1, copie_prestito = copie_prestito - 1 WHERE titolo ILIKE '%s';", title);
+    execute_query(query);
+
     send(sock, "Film restituito con successo!\n", 31, 0);
 }
 
@@ -436,15 +485,17 @@ void view_rent(int sock, int id_user){
         "SELECT titolo, TO_CHAR(data_restituzione, 'DD-MM-YYYY') AS data_restituzione FROM prestiti p JOIN film f ON p.id_film = f.id "
         "WHERE id_utente = %d AND (stato = 'effettuato' OR stato = 'scaduto') ;", id_user);
 
-    PGresult *res = PQexec(conn, query);
-    int rows = PQntuples(res);
-    if (rows == 0) {
+    PGresult *res = execute_select(query);
+    
+    if (!res || PQntuples(res) == 0) {
+        if (res) PQclear(res);
         send(sock, "Nessun film noleggiato!\n", 25, 0);
-        PQclear(res);
         return;
     }
 
-    char message[BUFFER_SIZE * 4] = "\n";  // 
+    int rows = PQntuples(res);
+
+    char message[BUFFER_SIZE * 4] = "\n"; 
     for (int i = 0; i < rows; i++) {
         char line[BUFFER_SIZE];
         snprintf(line, BUFFER_SIZE, "%d - %s da consegnare entro il %s\n", i+1, PQgetvalue(res, i, 0), PQgetvalue(res, i, 1));
@@ -466,14 +517,16 @@ void view_notifications(int sock, int id_user){
     snprintf(query, BUFFER_SIZE,
         "SELECT f.titolo, TO_CHAR(p.data_restituzione, 'DD-MM-YYYY') FROM prestiti p JOIN film f ON p.id_film = f.id "
         "WHERE id_utente = %d AND p.id_film = f.id AND stato = 'scaduto'; ", id_user);
-    PGresult *res = PQexec(conn, query);
+    PGresult *res = execute_select(query);
 
-    int rows = PQntuples(res);
-    if (rows == 0) {
+    
+    if (!res || PQntuples(res) == 0) {
+        if (res) PQclear(res);
         send(sock, "Non hai nessun messaggio!\n", 27, 0);
-        PQclear(res);
         return;
     }
+
+    int rows = PQntuples(res);
 
     char message[BUFFER_SIZE * 4] = "\n";  // 
     for (int i = 0; i < rows; i++) {
