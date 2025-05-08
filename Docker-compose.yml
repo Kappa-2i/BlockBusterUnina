@@ -1,0 +1,41 @@
+version: "3.8"
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: videoteca
+    ports:
+      - "5433:5432" 
+    volumes:
+      - ./initDb/init.sql:/docker-entrypoint-initdb.d/init.sql 
+    networks:
+      - blockbuster-network
+
+  server:
+    build: ./server
+    environment:
+      DB_HOST: blockbusterunina-db-1.blockbusterunina_blockbuster-network
+      DB_PORT: 5432
+      DB_NAME: videoteca
+      DB_USER: postgres
+      DB_PASSWORD: admin
+    ports:
+      - 8080:8080
+    depends_on:
+      - db
+    networks:
+      - blockbuster-network
+
+  client:
+    build: ./client
+    depends_on:
+      - server
+    networks:
+      - blockbuster-network
+    stdin_open: true
+    tty: true
+
+networks:
+  blockbuster-network:
+    driver: bridge

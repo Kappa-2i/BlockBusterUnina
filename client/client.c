@@ -5,7 +5,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
-
+#include <netdb.h>
 
 #define GREEN "\x1b[32m"
 #define YELLOW "\x1b[33m"
@@ -22,35 +22,70 @@ int main()
     char buffer[BUFFER_SIZE];
     char current_user[BUFFER_SIZE] = "";
 
-    int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
+    int sock;
     struct sockaddr_in server_addr;
+    struct addrinfo hints, *res;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    int status = getaddrinfo("server", "8080", &hints, &res);
+    if (status != 0)
+    {
+        fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(status));
+        exit(EXIT_FAILURE);
+    }
+
+    memcpy(&server_addr.sin_addr, &((struct sockaddr_in *)res->ai_addr)->sin_addr, sizeof(struct in_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(8080);
-    inet_aton("127.0.0.1", &(server_addr.sin_addr));
 
-    if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    int connected = 0;
+    for (int i = 0; i < 10; i++)
     {
-        perror("Errore");
+        sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (sock < 0)
+        {
+            perror("Errore creazione socket");
+            exit(EXIT_FAILURE);
+        }
+
+        if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == 0)
+        {
+            connected = 1;
+            break;
+        }
+
+        close(sock);
+        printf("Connessione al server fallita. Ritento tra 2 secondi...\n");
+        sleep(2);
+    }
+
+    freeaddrinfo(res);
+
+    if (!connected)
+    {
+        fprintf(stderr, "Impossibile connettersi al server dopo vari tentativi.\n");
         exit(EXIT_FAILURE);
     }
 
     printf("Connesso al server\n");
-    while (1){
-        printMenu(current_user);
+    fflush(stdout);
 
-        //fgets(buffer, BUFFER_SIZE, stdin);
+    while (1)
+    {
+        printMenu(current_user);
 
         if (fgets(buffer, BUFFER_SIZE, stdin) == NULL) {
             printf("Errore nella lettura dell'input.\n");
             continue;
         }
-        
+
         buffer[strcspn(buffer, "\n")] = 0;
         if (!strcmp(buffer, "ESCI") || !strcmp(buffer, "0")){
             break;
         }
-
 
         send(sock, buffer, strlen(buffer), 0);
 
@@ -60,9 +95,11 @@ int main()
             handleServerResponse(buffer, current_user);
         }
     }
+
     close(sock);
     return 0;
 }
+
 
 void printMenu(const char *current_user){
 

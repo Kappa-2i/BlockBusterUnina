@@ -34,6 +34,7 @@ void view_notifications(int sock, int id_user);
 
 int main()
 {
+    printf("Avvio del server...\n");
     int server_fd, client_fd;
     struct sockaddr_in server_addr, client_addr;
     socklen_t client_len = sizeof(client_addr);
@@ -65,8 +66,8 @@ int main()
         perror("Listen failed");
         exit(EXIT_FAILURE);
     }
-    printf("Server in ascolto sulla porta %d...\n", PORT);
-
+    printf("Server in ascolto sulla porta %d...\n", PORT);  // Aggiungi un log qui
+    fflush(stdout);
     while (1)
     {
         client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
@@ -140,16 +141,20 @@ void *handle_client(void *client_socket){
 }
 
 void setup_database() {
-    conn = PQconnectdb("dbname=videoteca user=postgres password=admin host=localhost");
+    for (int i = 0; i < 10; i++) {
+        conn = PQconnectdb("port=5432 dbname=videoteca user=postgres password=admin host=db");
+        if (PQstatus(conn) == CONNECTION_OK) break;
+        printf("Connessione fallita, ritento in 2 secondi...\n");
+        PQfinish(conn);
+        sleep(2);
+    }
+
     if (PQstatus(conn) != CONNECTION_OK) {
         fprintf(stderr, "Errore di connessione al database: %s", PQerrorMessage(conn));
         PQfinish(conn);
         exit(EXIT_FAILURE);
     }
     printf("Connessione al database avvenuta con successo!\n");
-    execute_query("CREATE TABLE IF NOT EXISTS utenti (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE, password VARCHAR(50));");
-    execute_query("CREATE TABLE IF NOT EXISTS film (id SERIAL PRIMARY KEY, titolo VARCHAR(100), copie_disponibili INT, copie_prestito INT);");
-    execute_query("CREATE TABLE IF NOT EXISTS prestiti (id SERIAL PRIMARY KEY, id_utente INT, id_film INT, data_prestito TIMESTAMP, data_restituzione TIMESTAMP, FOREIGN KEY (id_utente) REFERENCES utenti(id), FOREIGN KEY (id_film) REFERENCES film(id));");
 }
 
 

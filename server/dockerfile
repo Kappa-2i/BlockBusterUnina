@@ -1,0 +1,18 @@
+FROM ubuntu:20.04
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    build-essential 
+
+WORKDIR /app
+
+COPY server.c /app/server.c
+
+RUN LIBPQ_PATH=$(find / -name "libpq-fe.h" | head -n 1) && \
+    if [ -z "$LIBPQ_PATH" ]; then echo "libpq-fe.h non trovato"; exit 1; fi && \
+    GCC_INCLUDE_PATH=$(dirname "$LIBPQ_PATH") && \
+    GCC_LIB_PATH="/usr/lib/postgresql" && \
+    gcc server.c -o server -I$GCC_INCLUDE_PATH -L$GCC_LIB_PATH -lpq -lpthread
+
+CMD ["./server"]

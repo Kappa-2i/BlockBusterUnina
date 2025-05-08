@@ -1,0 +1,13 @@
+FROM ubuntu:20.04
+
+RUN apt-get update && apt-get install -y \
+    iputils-ping \
+    gcc
+
+WORKDIR /app
+
+COPY client.c /app/client.c
+
+RUN gcc -o client client.c
+
+CMD ["./client"]
