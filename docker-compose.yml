@@ -9,6 +9,7 @@ services:
       - "5433:5432" 
     volumes:
       - ./initDb/init.sql:/docker-entrypoint-initdb.d/init.sql 
+      - pgdata:/var/lib/postgresql/data
     networks:
       - blockbuster-network
 
@@ -35,6 +36,9 @@ services:
       - blockbuster-network
     stdin_open: true
     tty: true
+
+volumes:
+  pgdata:
 
 networks:
   blockbuster-network:

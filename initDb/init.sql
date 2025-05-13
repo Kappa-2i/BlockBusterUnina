@@ -1,5 +1,5 @@
 DO $$ BEGIN
-    CREATE TYPE stato AS ENUM ('effettuato', 'scaduto', 'restituito');
+    CREATE TYPE stato AS ENUM ('in_attesa', 'scaduto', 'effettuato');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;

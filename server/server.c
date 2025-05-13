@@ -8,7 +8,7 @@
 #include <time.h>
 
 #define PORT 8080
-#define MAX_CLIENTS 2
+#define MAX_CLIENTS 10
 #define BUFFER_SIZE 1024
 #define MAX_RENT 10
 
@@ -66,7 +66,7 @@ int main()
         perror("Listen failed");
         exit(EXIT_FAILURE);
     }
-    printf("Server in ascolto sulla porta %d...\n", PORT);  // Aggiungi un log qui
+    printf("Server in ascolto sulla porta %d...\n", PORT);
     fflush(stdout);
     while (1)
     {
