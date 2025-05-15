@@ -1,14 +1,13 @@
 version: "3.8"
 services:
   db:
-    image: postgres:15
+    build: ./initDb
     environment:
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: videoteca
     ports:
       - "5433:5432" 
     volumes:
-      - ./initDb/init.sql:/docker-entrypoint-initdb.d/init.sql 
       - pgdata:/var/lib/postgresql/data
     networks:
       - blockbuster-network

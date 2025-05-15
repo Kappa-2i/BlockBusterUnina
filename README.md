@@ -5,29 +5,29 @@
 
 ## **Funzionalità**
 ### **Autenticazione**
-<ins>**Registrazione**</ins>: REGISTRAZIONE <username\> <password\>
+- <ins>**Registrazione**</ins>: REGISTRAZIONE <username\> <password\>
 
-<ins>**Login**</ins>: LOGIN <username\> <password\>
+- <ins>**Login**</ins>: LOGIN <username\> <password\>
 
 ### **Catalogo Film**
-<ins>**Ricerca film**</ins>: CERCA <titolo\>
+- <ins>**Ricerca film**</ins>: CERCA <titolo\>
 
 ### **Carrello**
-<ins>**Aggiungi al carrello**</ins>: AGGIUNGI_AL_CARRELLO <titolo\>
+- <ins>**Aggiungi al carrello**</ins>: AGGIUNGI_AL_CARRELLO <titolo\>
 
-<ins>**Rimuovi dal carrello**</ins>: RIMUOVI_DAL_CARRELLO <titolo\>
+- <ins>**Rimuovi dal carrello**</ins>: RIMUOVI_DAL_CARRELLO <titolo\>
 
-<ins>**Visualizza carrello**</ins>: VISUALIZZA_CARRELLO
+- <ins>**Visualizza carrello**</ins>: VISUALIZZA_CARRELLO
 
 ### **Noleggio**
-<ins>**Checkout**</ins>: CHECKOUT (conferma noleggio dei film nel carrello)
+- <ins>**Checkout**</ins>: CHECKOUT (conferma noleggio dei film nel carrello)
 
-<ins>**Restituzione film**</ins>: RESTITUISCI_FILM <titolo\>
+- <ins>**Restituzione film**</ins>: RESTITUISCI_FILM <titolo\>
 
-<ins>**Visualizza prestiti attivi**</ins>: VISUALIZZA_PRESTITI
+- <ins>**Visualizza prestiti attivi**</ins>: VISUALIZZA_PRESTITI
 
 ### **Notifiche**
-<ins>**Messaggi di notifica**</ins>: VISUALIZZA_MESSAGGI (mostra film con prestiti scaduti)
+- <ins>**Messaggi di notifica**</ins>: VISUALIZZA_MESSAGGI (mostra film con prestiti scaduti)
 
 ### **Limitazioni**
 **Numero massimo di film noleggiabili contemporaneamente**: 10
