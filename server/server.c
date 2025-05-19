@@ -21,7 +21,7 @@ PGresult* execute_select(const char* query);
 void setup_database();
 
 void register_user(int sock, char* arg1, char* arg2);
-int login_user(int sock, char* arg1, char* arg2);
+int login_user(int sock, char* arg1, char* arg2, int old_id_user);
 void search_film(int sock, char* arg1);
 void add_to_cart(int sock, int id_user, char* arg1);
 void remove_from_cart(int sock, int id_user, char* arg1);
@@ -112,7 +112,7 @@ void *handle_client(void *client_socket){
         } else if (!strcmp(command, "LOGIN") || !strcmp(command, "2")) {
             char *username = strtok(args, " ");
             char *password = strtok(NULL, " ");
-            id_user = login_user(sock, username, password);
+            id_user = login_user(sock, username, password, id_user);
         } else if (!strcmp(command, "CERCA") || !strcmp(command, "3")) {
             search_film(sock, args);  
         } else if (!strcmp(command, "AGGIUNGI_AL_CARRELLO" ) || !strcmp(command, "4")) {
@@ -166,7 +166,6 @@ int execute_query(const char *query) {
     pthread_mutex_unlock(&db_mutex);
 
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        fprintf(stderr, "Errore nell'esecuzione della query: %s", PQerrorMessage(conn));
         PQclear(res);
         return 0;
     }
@@ -207,7 +206,7 @@ void register_user(int sock, char *username, char *password) {
 }
 
 
-int login_user(int sock, char *username, char *password) {
+int login_user(int sock, char *username, char *password, int old_id_user) {
 
     char query[BUFFER_SIZE];
     snprintf(query, BUFFER_SIZE,
@@ -217,6 +216,7 @@ int login_user(int sock, char *username, char *password) {
     if (!res || PQntuples(res) == 0) {
         if (res) PQclear(res);
         send(sock, "Inserisci credenziali valide", 28, 0);
+        if (old_id_user != -1) return old_id_user;
         return -1;
     }
 
